@@ -24,6 +24,8 @@
 #define JUMP (4)
 #define VERTDRAG (0.3)
 #define HORDRAG (0.2)
+// fireball
+#define SHOOT (5)
 // castle
 #define CASTLE_WIDTH (57)
 #define CASTLE_HEIGHT (9)
@@ -113,6 +115,21 @@ char * player_ul_image =
 /**/ "  |  "
 /**/ " / \\ "
 /**/ " \\  \\";
+
+char * fire_ball_l = 
+/**/ "/~\\ "
+/**/ "| ~~"
+/**/ "\\~/ "; // 3x4
+
+char * fire_ball_r = 
+/**/ " /~\\"
+/**/ "~~ |"
+/**/ " \\~/"; // 3x4
+
+char * fire_ball_u = 
+/**/ " /~\\"
+/**/ " | |"
+/**/ " \\ /"; // 3x4
 
 char * castle_image =
 /**/	"	                                |>>>                                "
@@ -208,15 +225,16 @@ bool sprites_collided(sprite_id sprite_1, sprite_id sprite_2);
 void draw_time(void);
 
 // STRUCT DEFINED
-typedef struct Player {
+typedef struct Character {
     bool landed; // is the player grounded?
-    double xh;      // player's x coordinate 
-    double yh;      // player's y coordinate
+    double xh;   // player's x coordinate 
+    double yh;   // player's y coordinate
     double dxh;  // player's x velocity
     double dyh;  // player's y velocity
     int itter;
-} Player;
-struct Player player1;
+} Character;
+struct Character player1;
+struct Character fireball;
 
 
 // VARIABLE INITIALISATION
@@ -226,6 +244,7 @@ sprite_id platform1;
 sprite_id wall1;
 sprite_id wall2;
 sprite_id player1_sprite;
+sprite_id fireball_sprite;
 // bool 
 bool game_over = false;
 // timer
@@ -288,6 +307,18 @@ void setup_game() {
     player1.dyh = 0;
     player1.landed = true;
     player1.itter = 0;
+    // create player sprite
+    player1_sprite = sprite_create(player1.xh, player1.yh, PLAYER_WIDTH, PLAYER_HEIGHT, player_s_image);
+
+    // initialise fire ball
+    fireball.xh = screen_width()/2;
+    fireball.yh = screen_height() - PLAYER_HEIGHT - 1;
+    fireball.dxh = 0;
+    fireball.dyh = 0;
+    fireball.landed = false; // here landed means shot
+    fireball.itter = 0;
+    // create fireball sprite
+    fireball_sprite = sprite_create(screen_width() + 5, screen_height() + 5, 4, 3, fire_ball_r);
 
     // create castle sprite
     castle = sprite_create(screen_width() - CASTLE_WIDTH, screen_height() - CASTLE_HEIGHT - 8, 69, 16, castle_image);
@@ -297,8 +328,7 @@ void setup_game() {
     wall1 = sprite_create(0, 1, 3, screen_height() - 2, wall_image);
     wall2 = sprite_create(screen_width() - 3, 1, 3, screen_height() - 2, wall_image);
 
-    // create player sprite
-    player1_sprite = sprite_create(player1.xh, player1.yh, PLAYER_WIDTH, PLAYER_HEIGHT, player_s_image);
+    
 }
 
 
@@ -343,12 +373,43 @@ void update_player(key) {
 
     // interpret user input
     if (( 'a' == key || KEY_LEFT == key ) && player1.xh > 1) {
+        // move left
         player1.dxh -= DASH;
     } else if (( 'd' == key || KEY_RIGHT == key ) && player1.xh < screen_width() - sprite_width(player1_sprite) - 1) {
+        // move right
         player1.dxh += DASH;
     } else if (( 'w' == key || KEY_UP == key) && player1.landed) {
+        // jump
         player1.dyh -= JUMP;
         player1.landed = false;
+    }
+    
+    // shoot fireball
+    if ('\n' == key) {
+        // shoot
+        fireball.landed = true;
+        if (player1.dxh > 0) {
+            // shoot right
+            fireball.xh = player1.xh + PLAYER_WIDTH;
+            fireball.yh = player1.yh + 1;
+            fireball.dxh += SHOOT;
+            sprite_move_to(fireball_sprite, fireball.xh, fireball.yh);
+            sprite_set_image(fireball_sprite, fire_ball_r);
+        } else if (player1.dxh < 0) {
+            // shoot left
+            fireball.xh = player1.xh - 4;
+            fireball.yh = player1.yh + 1;
+            fireball.dxh -= SHOOT;
+            sprite_move_to(fireball_sprite, fireball.xh, fireball.yh);
+            sprite_set_image(fireball_sprite, fire_ball_l);
+        } else {
+            // shoot up
+            fireball.xh = player1.xh;
+            fireball.yh = player1.yh - 3;
+            fireball.dyh -= SHOOT;
+            sprite_move_to(fireball_sprite, fireball.xh, fireball.yh);
+            sprite_set_image(fireball_sprite, fire_ball_u);
+        }
     }
 
     // apply drag
@@ -424,12 +485,21 @@ void update_player(key) {
             // if standing still up
             sprite_set_image(player1_sprite, player_s_image);
         }
-        
     }
-    
+
+    // move fireball
+    sprite_turn_to(fireball_sprite, 0, 0);
+    sprite_step(fireball_sprite);
 
     // draw player
     sprite_draw(player1_sprite);
+    sprite_draw(fireball_sprite);
+
+    draw_formatted(screen_width()/8, screen_height()/8, "shot: %d", '\n' == key);
+    draw_formatted(screen_width()/8, screen_height()/8 + 1, "x: %f", fireball.xh);
+    draw_formatted(screen_width()/8, screen_height()/8 + 2, "y: %f", fireball.xh);
+    draw_formatted(screen_width()/8, screen_height()/8 + 3, "vx: %f", fireball.dxh);
+    draw_formatted(screen_width()/8, screen_height()/8 + 4, "vy: %f", fireball.dyh);
 }
 
 
