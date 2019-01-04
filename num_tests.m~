@@ -1,0 +1,16 @@
+format compact
+format shortg
+clc, clear
+
+r = -0.5;
+x = 4
+
+for i = 1:15
+    figure, hold on
+    plot(i, x)
+    if x > 0
+        x = x + r*x
+    else
+        x = 0
+    end
+end
