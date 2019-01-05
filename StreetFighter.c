@@ -23,7 +23,7 @@
 #define DASH (10)
 #define JUMP (4)
 #define VERTDRAG (0.3)
-#define HORDRAG (0.2)
+#define HORDRAG (0.4)
 // fireball
 #define SHOOT (5)
 // castle
@@ -224,6 +224,7 @@ void update_player1(int);
 void update_player2(int);
 bool sprites_collided(sprite_id sprite_1, sprite_id sprite_2);
 void draw_time(void);
+bool game_over_screen(int);
 
 // STRUCT DEFINED
 typedef struct Character {
@@ -232,6 +233,7 @@ typedef struct Character {
     double yh;   // player's y coordinate
     double dxh;  // player's x velocity
     double dyh;  // player's y velocity
+    int health;
     int itter;
 } Character;
 struct Character player1;
@@ -260,17 +262,38 @@ time_t time_end;
 // MAIN
 int main(void) {
     setup_screen();
+    bool play = true;
+    int player_dead = 0;
 
-    int screen_opt = openingScreen();
-    setup_game();
-    time_start = time(NULL);
+    while (play) {
+        int screen_opt = openingScreen();
+        setup_game();
+        time_start = time(NULL);
+        
+        if (screen_opt == 1) {
+            // players chose play
+            while (!game_over) {
+                clear_screen();
+                game_process();
+                show_screen();
 
-    while ((screen_opt == 1) && !game_over) {
-        clear_screen();
-        game_process();
-        show_screen();
-        timer_pause(DELAY);
-    } // opt 2 and 3
+                if (player1.health <= 0) {
+                    game_over = true;
+                    player_dead = 1;
+                } else if (player2.health <= 0) {
+                    game_over = true;
+                    player_dead = 2;
+                }
+
+                timer_pause(DELAY);
+            } // opt 2 and 3
+
+            play = game_over_screen(player_dead);
+        } else {
+            // players chose quit
+            play = false;
+        }
+    }
 
     return 0;
 }
@@ -279,8 +302,8 @@ int main(void) {
 // GAME OPENING SCREEN
 int openingScreen() {
     char str1[] = "WELCOME";
-    char str2[] = "Press 1 to play";
-    char str3[] = "Press 2 to exit";
+    char str2[] = "Press 1 to Play";
+    char str3[] = "Press 2 to Exit";
 
     // draw messages to screen
     clear_screen();
@@ -296,8 +319,6 @@ int openingScreen() {
             return 1;
         } else if (key == '2') {
             return 2;
-        } else if (key == '3') {
-            return 3;
         }
     }
 }
@@ -305,12 +326,16 @@ int openingScreen() {
 
 // INITIALISE EVERYTHING
 void setup_game() {
+    // game variables
+    game_over = false;
+
     // initialise player 1
     player1.xh = screen_width()/3;
     player1.yh = screen_height() - PLAYER_HEIGHT - 1;
     player1.dxh = 0;
     player1.dyh = 0;
     player1.landed = true;
+    player1.health = 100;
     player1.itter = 0;
     // create player sprite
     player1_sprite = sprite_create(player1.xh, player1.yh, PLAYER_WIDTH, PLAYER_HEIGHT, player_s_image);
@@ -321,6 +346,7 @@ void setup_game() {
     player2.dxh = 0;
     player2.dyh = 0;
     player2.landed = true;
+    player2.health = 100;
     player2.itter = 0;
     // create player sprite
     player2_sprite = sprite_create(player2.xh, player2.yh, PLAYER_WIDTH, PLAYER_HEIGHT, player_s_image);
@@ -364,6 +390,10 @@ void game_process() {
     // update and draw player
     update_player1(key);
     update_player2(key);
+    draw_formatted(5, 3, "Player 1's Health: %d", player1.health);
+    draw_formatted(screen_width() - 30, 3, "Player 2's Health: %d", player2.health);
+
+    // draw time
     draw_time();
 
     player1.itter++;
@@ -394,6 +424,10 @@ void update_player1(key) {
     player1.yh = sprite_y(player1_sprite);
     player1.dxh = sprite_dx(player1_sprite);
     player1.dyh = sprite_dy(player1_sprite);
+
+    if (player1.itter % 5 == 0 && player1.health < 100) {
+        player1.health += 2;
+    }
 
     // interpret user input
     if (( 'a' == key) && player1.xh > 1) {
@@ -522,7 +556,10 @@ void update_player1(key) {
         fireball1.xh = sprite_x(fireball1_sprite);
         fireball1.yh = sprite_y(fireball1_sprite);
 
-        if (fireball1.xh > screen_width() + 4 || fireball1.xh < -4 || fireball1.yh < -3) {
+        if (fireball1.xh > screen_width() + 4 || fireball1.xh < -4 || fireball1.yh < -3 || sprites_collided(player2_sprite, fireball1_sprite)) {
+            if (sprites_collided(player2_sprite, fireball1_sprite)) {
+                player2.health -= 20;
+            }
             fireball1.xh = screen_width()/2;
             fireball1.yh = screen_height() - PLAYER_HEIGHT - 1;
             fireball1.dxh = 0;
@@ -543,6 +580,10 @@ void update_player2(key) {
     player2.yh = sprite_y(player2_sprite);
     player2.dxh = sprite_dx(player2_sprite);
     player2.dyh = sprite_dy(player2_sprite);
+
+    if (player2.itter % 5 == 0 && player2.health < 100) {
+        player2.health += 2;
+    }
 
     // interpret user input
     if ((KEY_LEFT == key ) && player2.xh > 1) {
@@ -663,7 +704,7 @@ void update_player2(key) {
 
     // move fireball
     if (fireball2.landed) {
-        draw_formatted(player2.xh + PLAYER_WIDTH, player2.yh - 1, "HADOUKEN!");
+        draw_formatted(player2.xh + PLAYER_WIDTH, player2.yh - 1, "FUS RO DAH!");
         sprite_turn_to(fireball2_sprite, fireball2.dxh, fireball2.dyh);
         sprite_step(fireball2_sprite);
         sprite_draw(fireball2_sprite);
@@ -671,7 +712,10 @@ void update_player2(key) {
         fireball2.xh = sprite_x(fireball2_sprite);
         fireball2.yh = sprite_y(fireball2_sprite);
 
-        if (fireball2.xh > screen_width() + 4 || fireball2.xh < -4 || fireball2.yh < -3) {
+        if (fireball2.xh > screen_width() + 4 || fireball2.xh < -4 || fireball2.yh < -3 || sprites_collided(player1_sprite, fireball2_sprite)) {
+            if (sprites_collided(player1_sprite, fireball2_sprite)) {
+                player1.health -= 20;
+            }
             fireball2.xh = screen_width()/2;
             fireball2.yh = screen_height() - PLAYER_HEIGHT - 1;
             fireball2.dxh = 0;
@@ -705,5 +749,37 @@ void draw_time() {
     int mins = floor(time_elap/60);
     int secs = (int) time_elap % 60;
 
-    draw_formatted(screen_width()/8, screen_height()/8 - 1, "Game Timer: %02d:%02d", mins, secs);
+    draw_formatted(5, 1, "Game Timer: %02d:%02d", mins, secs);
+}
+
+
+// GAMEOVER SCREEN
+bool game_over_screen(int player_dead) {
+    char str1[] = "GAME OVER";
+
+    char str2[] = "Player 2 died! Congradulations Player 1!"; 
+    if (player_dead == 1) {
+        strcpy(str2, "Player 1 died! Congradulations Player 2!");
+    }
+    
+    char str3[] = "Press 1 to Return to Menu";
+    char str4[] = "Press 2 to Exit";
+
+    // draw messages to screen
+    clear_screen();
+    draw_formatted((screen_width() - strlen(str1))/2, screen_height()/2, str1);
+    draw_formatted((screen_width() - strlen(str2))/2, screen_height()/2 + 2, str2);
+    draw_formatted((screen_width() - strlen(str3))/2, screen_height()/2 + 4, str3);
+    draw_formatted((screen_width() - strlen(str4))/2, screen_height()/2 + 5, str4);
+    show_screen();
+
+    // receive input
+    while (true) {
+        int key = wait_char();
+        if (key == '1') {
+            return true;
+        } else if (key == '2') {
+            return false;
+        }
+    }
 }
